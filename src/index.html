@@ -26,9 +26,9 @@
 				)
 			}
 
-			function normalise(tensor) {
-				const min = tensor.min()
-				const max = tensor.max()
+			function normalise(tensor, previousMin = null, previousMax = null) {
+				const min = previousMin || tensor.min()
+				const max = previousMax || tensor.max()
 				const normalisedTenser = tensor.sub(min).div(max.sub(min))
 				return { tensor: normalisedTenser, min, max }
 			}
@@ -80,7 +80,35 @@
 				})
 			}
 
-			async function predict() {}
+			async function predict() {
+				const predictionInput = parseInt(
+					document.getElementById('prediction-input').value
+				)
+				if (isNaN(predictionInput)) {
+					alert('Please enter a valid number')
+				} else {
+					tf.tidy(() => {
+						const inputTensor = tf.tensor1d([predictionInput])
+						const normalisedInput = normalise(
+							inputTensor,
+							normalisedFeature.min,
+							normalisedFeature.max
+						)
+						const normalisedOutputTensor = model.predict(normalisedInput.tensor)
+						const outputTensor = denormalise(
+							normalisedOutputTensor,
+							normalisedLabel.min,
+							normalisedLabel.max
+						)
+						const outputValue = outputTensor.dataSync()[0]
+						const outputValueRounded =
+							Math.round(outputValue / 1000).toFixed(0) * 1000
+						document.getElementById(
+							'prediction-output'
+						).innerHTML = `Price: ${outputValueRounded}`
+					})
+				}
+			}
 
 			async function load() {
 				const storageKey = `localstorage://${storageId}`
@@ -158,6 +186,7 @@
 				document.getElementById('test-button').removeAttribute('disabled')
 				document.getElementById('save-button').removeAttribute('disabled')
 				document.getElementById('load-button').removeAttribute('disabled')
+				document.getElementById('predict-button').removeAttribute('disabled')
 			}
 
 			async function toggleVisor() {
