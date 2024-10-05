@@ -18,12 +18,49 @@
 	</head>
 	<body>
 		<script type="text/javascript">
-			async function plot(pointsArray, featureName) {
+			async function plot(
+				pointsArray,
+				featureName,
+				predictedPointsArray = null
+			) {
+				const values = [pointsArray.slice(0, 1000)]
+				const series = ['original']
+				if (Array.isArray(predictedPointsArray)) {
+					values.push(predictedPointsArray)
+					series.push('predicted')
+				}
+
 				tfvis.render.scatterplot(
 					{ name: `${featureName} vs House Price` },
-					{ values: [pointsArray], series: ['original'] },
+					{ values, series },
 					{ xLabel: featureName, yLabel: 'Price' }
 				)
+			}
+
+			async function plotPredictionLine() {
+				const [xs, ys] = tf.tidy(() => {
+					const normalisedXs = tf.linspace(0, 1, 100)
+					const normalisedYs = model.predict(normalisedXs.reshape([100, 1]))
+
+					const xs = denormalise(
+						normalisedXs,
+						normalisedFeature.min,
+						normalisedFeature.max
+					)
+					const ys = denormalise(
+						normalisedYs,
+						normalisedLabel.min,
+						normalisedLabel.max
+					)
+
+					return [xs.dataSync(), ys.dataSync()]
+				})
+
+				const predictedPoints = Array.from(xs).map((val, index) => {
+					return { x: val, y: ys[index] }
+				})
+
+				await plot(points, 'Square Feet', predictedPoints)
 			}
 
 			function normalise(tensor, previousMin = null, previousMax = null) {
@@ -45,7 +82,7 @@
 				model.add(
 					tf.layers.dense({
 						units: 1,
-						useBias: true,
+						useBias: false,
 						activation: 'linear',
 						inputDim: 1,
 					})
@@ -76,6 +113,11 @@
 					validationSplit: 0.2,
 					callbacks: {
 						onEpochEnd,
+						onEpochBegin: async function () {
+							await plotPredictionLine()
+							const layer = model.getLayer(undefined, 0)
+							tfvis.show.layer({ name: 'Layer 1' }, layer)
+						},
 					},
 				})
 			}
@@ -86,6 +128,8 @@
 				)
 				if (isNaN(predictionInput)) {
 					alert('Please enter a valid number')
+				} else if (predictionInput < 200) {
+					alert('Please enter a number greater than 200')
 				} else {
 					tf.tidy(() => {
 						const inputTensor = tf.tensor1d([predictionInput])
@@ -124,6 +168,9 @@
 					document.getElementById(
 						'model-status'
 					).innerHTML = `Model saved ${modelInfo.dateSaved}`
+
+					await plotPredictionLine()
+
 					document.getElementById('test-button').removeAttribute('disabled')
 					document.getElementById('train-button').removeAttribute('disabled')
 					document.getElementById('predict-button').removeAttribute('disabled')
@@ -165,6 +212,7 @@
 				tfvis.show.modelSummary({ name: 'Model Summary' }, model)
 				const layer = model.getLayer(undefined, 0)
 				tfvis.show.layer({ name: 'Layer 1' }, layer)
+				await plotPredictionLine()
 
 				const result = await trainModel(
 					model,
@@ -192,7 +240,7 @@
 			async function toggleVisor() {
 				tfvis.visor().toggle()
 			}
-
+			let points
 			let normalisedFeature, normalisedLabel
 			let trainingFeatureTensor,
 				trainingLabelTensor,
@@ -209,7 +257,7 @@
 					x: record['sqft_living'],
 					y: record['price'],
 				}))
-				const points = await pointsDataset.toArray()
+				points = await pointsDataset.toArray()
 				if (points.length % 2 !== 0) {
 					// If odd number of elements
 					points.pop() // Remove last element
