@@ -81,14 +81,30 @@
 
 				model.add(
 					tf.layers.dense({
+						units: 10,
+						useBias: true,
+						activation: 'sigmoid',
+						inputDim: 1,
+					})
+				)
+				model.add(
+					tf.layers.dense({
+						units: 10,
+						useBias: true,
+						activation: 'sigmoid',
+						inputDim: 1,
+					})
+				)
+				model.add(
+					tf.layers.dense({
 						units: 1,
-						useBias: false,
-						activation: 'linear',
+						useBias: true,
+						activation: 'sigmoid',
 						inputDim: 1,
 					})
 				)
 
-				const optimizer = tf.train.sgd(0.1)
+				const optimizer = tf.train.adam()
 				model.compile({
 					loss: 'meanSquaredError',
 					optimizer,
@@ -109,7 +125,7 @@
 
 				return model.fit(trainingFeatureTensor, trainingLabelTensor, {
 					batchSize: 32,
-					epochs: 20,
+					epochs: 100,
 					validationSplit: 0.2,
 					callbacks: {
 						onEpochEnd,
@@ -235,6 +251,17 @@
 				document.getElementById('save-button').removeAttribute('disabled')
 				document.getElementById('load-button').removeAttribute('disabled')
 				document.getElementById('predict-button').removeAttribute('disabled')
+			}
+
+			async function plotParams(weight, bias) {
+				// Set weights correctly
+				model.getLayer(null, 0).setWeights([
+					tf.tensor2d([[weight]], [1, 1]), // Ensure kernel shape is [1, 1]
+					tf.tensor1d([bias]), // Ensure bias shape is [1]
+				])
+				await plotPredictionLine() // Replot after setting weights
+				const layer = model.getLayer(undefined, 0)
+				tfvis.show.layer({ name: 'Layer 1' }, layer)
 			}
 
 			async function toggleVisor() {
