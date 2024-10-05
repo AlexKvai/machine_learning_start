@@ -82,9 +82,35 @@
 
 			async function predict() {}
 
-			async function load() {}
+			async function load() {
+				const storageKey = `localstorage://${storageId}`
+				const models = await tf.io.listModels()
+				const modelInfo = models[storageKey]
+				if (modelInfo) {
+					model = await tf.loadLayersModel(storageKey)
 
-			async function save() {}
+					tfvis.show.modelSummary({ name: 'Model Summary' }, model)
+					const layer = model.getLayer(undefined, 0)
+					tfvis.show.layer({ name: 'Layer 1' }, layer)
+
+					document.getElementById(
+						'model-status'
+					).innerHTML = `Model saved ${modelInfo.dateSaved}`
+					document.getElementById('test-button').removeAttribute('disabled')
+					document.getElementById('train-button').removeAttribute('disabled')
+					document.getElementById('predict-button').removeAttribute('disabled')
+				} else {
+					alert('Model not load')
+				}
+			}
+
+			const storageId = 'kc-house-price-regression'
+			async function save() {
+				const saveResults = await model.save(`localstorage://${storageId}`)
+				document.getElementById(
+					'model-status'
+				).innerHTML = `Model saved ${saveResults.modelArtifactsInfo.dateSaved}`
+			}
 
 			async function test() {
 				const lossTensor = await model.evaluate(
@@ -130,6 +156,8 @@
 					`Validation Loss: ${validationLoss.toPrecision(5)}`
 
 				document.getElementById('test-button').removeAttribute('disabled')
+				document.getElementById('save-button').removeAttribute('disabled')
+				document.getElementById('load-button').removeAttribute('disabled')
 			}
 
 			async function toggleVisor() {
@@ -191,6 +219,7 @@
 				//update status and enable train button
 				document.getElementById('model-status').innerHTML = 'No model trained'
 				document.getElementById('train-button').removeAttribute('disabled')
+				document.getElementById('load-button').removeAttribute('disabled')
 			}
 			run()
 		</script>
