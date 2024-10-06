@@ -18,6 +18,62 @@
 	</head>
 	<body>
 		<script type="text/javascript">
+			async function plotClasses(
+				pointsArray,
+				classKey,
+				size = 800,
+				equalizeClassSizes = true
+			) {
+				const allSeries = {}
+				//Add each class as series for the class it is in
+				pointsArray.forEach(p => {
+					const seriesName = `${classKey}: ${p.class}`
+					let series = allSeries[seriesName]
+					if (!series) {
+						series = []
+						allSeries[seriesName] = series
+					}
+					series.push(p)
+				})
+
+				if (equalizeClassSizes) {
+					//Find smallest class
+					let maxLength = null
+					Object.values(allSeries).forEach(series => {
+						if (
+							maxLength === null ||
+							(series.length < maxLength && series.length >= 100)
+						) {
+							maxLength = series.length
+						}
+					})
+					//Limit each class to number of elements in smallest class
+					Object.keys(allSeries).forEach(keyName => {
+						allSeries[keyName] = allSeries[keyName].slice(0, maxLength)
+						if (allSeries[keyName].length < 100) {
+							delete allSeries[keyName]
+						}
+					})
+				}
+
+				tfvis.render.scatterplot(
+					{
+						name: `Square feet vs House price`,
+						styles: { width: '100%' },
+					},
+					{
+						values: Object.values(allSeries),
+						series: Object.keys(allSeries),
+					},
+					{
+						xLabel: 'Square feet',
+						yLabel: 'Price',
+						height: size,
+						width: size * 1.5,
+					}
+				)
+			}
+
 			async function plot(
 				pointsArray,
 				featureName,
@@ -283,6 +339,7 @@
 				const pointsDataset = houseSalesDataset.map(record => ({
 					x: record['sqft_living'],
 					y: record['price'],
+					class: record['waterfront'],
 				}))
 				points = await pointsDataset.toArray()
 				if (points.length % 2 !== 0) {
@@ -290,7 +347,7 @@
 					points.pop() // Remove last element
 				}
 				tf.util.shuffle(points)
-				plot(points, 'Square Feet')
+				plotClasses(points, 'Waterfront')
 
 				// Extract Features (inputs)
 				const featureValues = points.map(p => p.x)
@@ -330,24 +387,22 @@
 		<!-- Header -->
 		<div class="section no-pad-bot" id="index-banner">
 			<div class="container">
-				<h5 class="header center blue-text small">
-					Linear regression with TensorFlow.js
+				<h5 class="header center green-text small">
+					Binary classification with TensorFlow.js
 				</h5>
 				<div class="row center">
-					<h6 class="header col s12 light">
-						Train a model to predict house price from living space.
-					</h6>
+					<h6 class="header col s12 light">Train a model to predict class.</h6>
 				</div>
 			</div>
 		</div>
 
 		<!-- Misc buttons -->
-		<div class="section no-pad-bot light-blue lighten-4">
+		<div class="section no-pad-bot light-green lighten-4">
 			<div class="container">
 				<div class="row center">
 					<button
 						id="toggle-button"
-						class="waves-effect waves-light light-blue btn-small"
+						class="waves-effect waves-light light-green btn-small"
 						onclick="toggleVisor()"
 					>
 						Toggle Visor
@@ -364,7 +419,7 @@
 					<!-- Training -->
 					<div class="col s12 m6">
 						<div class="icon-block">
-							<h3 class="center light-blue-text">
+							<h3 class="center light-green-text">
 								<i class="material-icons" style="font-size: 2em">build</i>
 							</h3>
 							<h5 class="center">Train & Test</h5>
@@ -387,7 +442,7 @@
 								<button
 									autocomplete="off"
 									id="train-button"
-									class="waves-effect light-blue waves-light btn"
+									class="waves-effect light-green waves-light btn"
 									disabled
 									onclick="train()"
 								>
@@ -396,7 +451,7 @@
 								<button
 									autocomplete="off"
 									id="test-button"
-									class="waves-effect light-blue waves-light btn"
+									class="waves-effect light-green waves-light btn"
 									disabled
 									onclick="test()"
 								>
@@ -409,7 +464,7 @@
 								<button
 									autocomplete="off"
 									id="load-button"
-									class="waves-effect light-blue waves-light btn-small"
+									class="waves-effect light-green waves-light btn-small"
 									disabled
 									onclick="load()"
 								>
@@ -418,7 +473,7 @@
 								<button
 									autocomplete="off"
 									id="save-button"
-									class="waves-effect light-blue waves-light btn-small"
+									class="waves-effect light-green waves-light btn-small"
 									disabled
 									onclick="save()"
 								>
@@ -431,7 +486,7 @@
 					<!-- Prediction -->
 					<div class="col s12 m6">
 						<div class="icon-block">
-							<h3 class="center light-blue-text">
+							<h3 class="center light-green-text">
 								<i class="material-icons" style="font-size: 2em">timeline</i>
 							</h3>
 							<h5 class="center">Predict</h5>
@@ -443,7 +498,7 @@
 							<button
 								autocomplete="off"
 								id="predict-button"
-								class="waves-effect light-blue waves-light btn"
+								class="waves-effect light-green waves-light btn"
 								disabled
 								onclick="predict()"
 							>
