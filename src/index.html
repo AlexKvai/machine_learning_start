@@ -120,15 +120,61 @@
 			}
 
 			function normalise(tensor, previousMin = null, previousMax = null) {
-				const min = previousMin || tensor.min()
-				const max = previousMax || tensor.max()
-				const normalisedTenser = tensor.sub(min).div(max.sub(min))
-				return { tensor: normalisedTenser, min, max }
+				const featureDimentions = tensor.shape.length > 1 && tensor.shape[1]
+
+				if (featureDimentions && featureDimentions > 1) {
+					//More that one feature
+
+					//Split into separrate tensors
+					const features = tf.split(tensor, featureDimentions, 1)
+
+					//Normalise and find min/max values for each feature
+					const normalisedFeature = features.map((featureTensor, i) =>
+						normalise(
+							featureTensor,
+							previousMin ? previousMin[i] : null,
+							previousMax ? previousMax[i] : null
+						)
+					)
+
+					//Prepare return values
+					const returnTensor = tf.concat(
+						normalisedFeature.map(f => f.tensor),
+						1
+					)
+					const min = normalisedFeature.map(f => f.min)
+					const max = normalisedFeature.map(f => f.max)
+
+					return { tensor: returnTensor, min, max }
+				} else {
+					//Just one feature
+					const min = previousMin || tensor.min()
+					const max = previousMax || tensor.max()
+					const normalisedTenser = tensor.sub(min).div(max.sub(min))
+					return { tensor: normalisedTenser, min, max }
+				}
 			}
 
 			function denormalise(tensor, min, max) {
-				const denormalisedTensor = tensor.mul(max.sub(min)).add(min)
-				return denormalisedTensor
+				const featureDimentions = tensor.shape.length > 1 && tensor.shape[1]
+
+				if (featureDimentions && featureDimentions > 1) {
+					//More that one feature
+
+					//Split into separrate tensors
+					const features = tf.split(tensor, featureDimentions, 1)
+					const denormalised = features.map((featureTensor, i) =>
+						denormalise(featureTensor, min[i], max[i])
+					)
+
+					const returnTensor = tf.concat(denormalised, 1)
+
+					return returnTensor
+				} else {
+					//Just one feature
+					const denormalisedTensor = tensor.mul(max.sub(min)).add(min)
+					return denormalisedTensor
+				}
 			}
 
 			let model
@@ -350,14 +396,11 @@
 				plotClasses(points, 'Waterfront')
 
 				// Extract Features (inputs)
-				const featureValues = points.map(p => p.x)
-				const featureTensor = tf.tensor2d(featureValues, [
-					featureValues.length,
-					1,
-				])
+				const featureValues = points.map(p => [p.x, p.y])
+				const featureTensor = tf.tensor2d(featureValues)
 
 				// Extract Lables (outputs)
-				const labelValues = points.map(p => p.y)
+				const labelValues = points.map(p => p.class)
 				const labelTensor = tf.tensor2d(labelValues, [labelValues.length, 1])
 
 				// Normalise Features and Lables
