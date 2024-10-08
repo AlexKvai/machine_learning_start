@@ -19,7 +19,7 @@
 				pointsArray,
 				classKey,
 				size = 400,
-				equalizeClassSizes = false
+				equalizeClassSizes = true
 			) {
 				const allSeries = {}
 				// Add each class as a series
@@ -143,28 +143,31 @@
 				const yTicks = await yTicksPromise
 				const xTickLabels = xTicks.map(v => (v / 1000).toFixed(1) + 'k sqft')
 				const yTickLabels = yTicks.map(v => '$' + (v / 1000).toFixed(0) + 'k')
-				const data = {
-					values,
-					xTickLabels,
-					yTickLabels,
-				}
 
-				tfvis.render.heatmap(
-					{
-						name: `${name} (local)`,
-						tab: 'Predictions',
-					},
-					data,
-					{ height: size }
-				)
-				tfvis.render.heatmap(
-					{
-						name: `${name} (full domain)`,
-						tab: 'Predictions',
-					},
-					data,
-					{ height: size, domain: [0, 1] }
-				)
+				tf.unstack(values, 2).forEach((values, i) => {
+					const data = {
+						values,
+						xTickLabels,
+						yTickLabels,
+					}
+
+					tfvis.render.heatmap(
+						{
+							name: `Bedrooms: ${getClassName(i)} (local)`,
+							tab: 'Predictions',
+						},
+						data,
+						{ height: size }
+					)
+					tfvis.render.heatmap(
+						{
+							name: `Bedrooms: ${getClassName(i)} (full domain)`,
+							tab: 'Predictions',
+						},
+						data,
+						{ height: size, domain: [0, 1] }
+					)
+				})
 			}
 
 			function normalise(tensor, previousMin = null, previousMax = null) {
@@ -319,16 +322,20 @@
 							normalisedLabel.min,
 							normalisedLabel.max
 						)
-						const outputValue = outputTensor.dataSync()[0]
-						const outputValuePercent = (outputValue * 100).toFixed(1)
+						const outputs = outputTensor.dataSync()
+						let outputString = ''
+						for (let i = 0; i < 3; i++) {
+							outputString += `Likelihood of having ${getClassName(
+								i
+							)} bedrooms is ${(outputs[i] * 100).toFixed(1)}%<br>`
+						}
 						document.getElementById('prediction-output').innerHTML =
-							`The likelihood of being a waterfront property is <br>` +
-							`<span style="font-size: 2em">${outputValuePercent}%</span>`
+							outputString
 					})
 				}
 			}
 
-			const storageID = 'kc-house-price-binary'
+			const storageID = 'kc-house-price-multi'
 			async function save() {
 				const saveResults = await model.save(`localstorage://${storageID}`)
 				document.getElementById(
@@ -470,7 +477,9 @@
 
 				// Extract Labels (outputs)
 				const labelValues = points.map(p => getClassIndex(p.class))
-				const labelTensor = tf.tidy(()=>tf.oneHot(tf.tensor1d(labelValues, 'int32'), 3))
+				const labelTensor = tf.tidy(() =>
+					tf.oneHot(tf.tensor1d(labelValues, 'int32'), 3)
+				)
 				labelTensor.print()
 
 				// Normalise features and labels
