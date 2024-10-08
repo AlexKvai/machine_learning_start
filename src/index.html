@@ -250,15 +250,15 @@
 				)
 				model.add(
 					tf.layers.dense({
-						units: 1,
+						units: 3,
 						useBias: true,
-						activation: 'sigmoid',
+						activation: 'softmax',
 					})
 				)
 
 				const optimizer = tf.train.adam()
 				model.compile({
-					loss: 'binaryCrossentropy',
+					loss: 'categoricalCrossentropy',
 					optimizer,
 				})
 
@@ -419,6 +419,24 @@
 				tfvis.visor().toggle()
 			}
 
+			function getClassIndex(className) {
+				if (className === 1 || className === '1') {
+					return 0 // 1 bedroom
+				} else if (className === 2 || className === '2') {
+					return 1 // 2 bedrooms
+				} else {
+					return 2 // 3+ bedrooms
+				}
+			}
+
+			function getClassName(classIndex) {
+				if (classIndex === 2) {
+					return '3+'
+				} else {
+					return classIndex + 1
+				}
+			}
+
 			let points
 			let normalisedFeature, normalisedLabel
 			let trainingFeatureTensor,
@@ -430,11 +448,13 @@
 				const houseSalesDataset = tf.data.csv('./kc_house_data.csv')
 
 				// Extract x and y values to plot
-				const pointsDataset = houseSalesDataset.map(record => ({
-					x: record.sqft_living,
-					y: record.price,
-					class: record.waterfront,
-				}))
+				const pointsDataset = houseSalesDataset
+					.map(record => ({
+						x: record.sqft_living,
+						y: record.price,
+						class: record.bedrooms > 2 ? '3+' : record.bedrooms,
+					}))
+					.filter(r => r.class !== 0)
 				points = await pointsDataset.toArray()
 				if (points.length % 2 !== 0) {
 					// If odd number of elements
@@ -442,15 +462,16 @@
 				}
 				console.log(points)
 				tf.util.shuffle(points)
-				plotClasses(points, 'Waterfront')
+				plotClasses(points, 'Bedrooms')
 
 				// Extract Features (inputs)
 				const featureValues = points.map(p => [p.x, p.y])
 				const featureTensor = tf.tensor2d(featureValues)
 
 				// Extract Labels (outputs)
-				const labelValues = points.map(p => p.class)
-				const labelTensor = tf.tensor2d(labelValues, [labelValues.length, 1])
+				const labelValues = points.map(p => getClassIndex(p.class))
+				const labelTensor = tf.tidy(()=>tf.oneHot(tf.tensor1d(labelValues, 'int32'), 3))
+				labelTensor.print()
 
 				// Normalise features and labels
 				normalisedFeature = normalise(featureTensor)
@@ -478,7 +499,7 @@
 		<!--   Header   -->
 		<div class="section no-pad-bot" id="index-banner">
 			<div class="container">
-				<h5 class="header center green-text small">
+				<h5 class="header center red-text small">
 					Multi-class classification with TensorFlow.js
 				</h5>
 				<div class="row center">
@@ -490,12 +511,12 @@
 		</div>
 
 		<!--   Misc buttons   -->
-		<div class="section no-pad-bot green lighten-4">
+		<div class="section no-pad-bot red lighten-4">
 			<div class="container">
 				<div class="row center">
 					<button
 						id="toggle-button"
-						class="waves-effect waves-light green btn-small"
+						class="waves-effect waves-light red btn-small"
 						onclick="toggleVisor()"
 					>
 						Toggle Visor
@@ -512,7 +533,7 @@
 					<!--   Training   -->
 					<div class="col s12 m6">
 						<div class="icon-block">
-							<h3 class="center green-text">
+							<h3 class="center red-text">
 								<i class="material-icons" style="font-size: 2em">build</i>
 							</h3>
 							<h5 class="center">Train & Test</h5>
@@ -535,7 +556,7 @@
 								<button
 									autocomplete="off"
 									id="train-button"
-									class="waves-effect green waves-light btn"
+									class="waves-effect red waves-light btn"
 									disabled
 									onclick="train()"
 								>
@@ -544,7 +565,7 @@
 								<button
 									autocomplete="off"
 									id="test-button"
-									class="waves-effect green waves-light btn"
+									class="waves-effect red waves-light btn"
 									disabled
 									onclick="test()"
 								>
@@ -557,7 +578,7 @@
 								<button
 									autocomplete="off"
 									id="load-button"
-									class="waves-effect green waves-light btn-small"
+									class="waves-effect red waves-light btn-small"
 									disabled
 									onclick="load()"
 								>
@@ -566,7 +587,7 @@
 								<button
 									autocomplete="off"
 									id="save-button"
-									class="waves-effect green waves-light btn-small"
+									class="waves-effect red waves-light btn-small"
 									disabled
 									onclick="save()"
 								>
@@ -579,7 +600,7 @@
 					<!--   Prediction   -->
 					<div class="col s12 m6">
 						<div class="icon-block">
-							<h3 class="center green-text">
+							<h3 class="center red-text">
 								<i class="material-icons" style="font-size: 2em">timeline</i>
 							</h3>
 							<h5 class="center">Predict</h5>
@@ -598,7 +619,7 @@
 							<button
 								autocomplete="off"
 								id="predict-button"
-								class="waves-effect green waves-light btn"
+								class="waves-effect red waves-light btn"
 								disabled
 								onclick="predict()"
 							>
